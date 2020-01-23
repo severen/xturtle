@@ -1,0 +1,6 @@
+# Compiled files an executables
+build/
+
+# Subprojects
+subprojects/*
+!subprojects/spdlog.wrap
