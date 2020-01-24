@@ -14,13 +14,14 @@
 // along with xturtle.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <iostream>
+#include <cmath>
 
+#include <CLI/CLI.hpp>
+#include <spdlog/spdlog.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_util.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
-#include <CLI/CLI.hpp>
-#include <spdlog/spdlog.h>
 
 #include "config.hh"
 
@@ -28,14 +29,153 @@
 const uint16_t WIDTH = 500;
 const uint16_t HEIGHT = 500;
 
-/// Run the event loop.
-void run(xcb_connection_t *connection, cairo_surface_t *surface) {
-  auto *cr = cairo_create(surface);
+/// Draw a line from the point (x1, y1) to the point (x2, y2).
+void draw_line(cairo_t *cr, double x1, double y1, double x2, double y2) {
+  cairo_move_to(cr, x1, y1);
+  cairo_line_to(cr, x2, y2);
+  cairo_stroke(cr);
+}
+
+struct Pen {
+  double red;
+  double green;
+  double blue;
+  double thickness;
+  bool down;
+};
+
+class Turtle {
+  private:
+    double x = 0;
+    double y = 0;
+    double direction = 0;
+    Pen pen = Pen{0, 0, 0, 0, true};
+
+  public:
+    void pen_up() {
+      this->pen.down = false;
+    }
+
+    void pen_down() {
+      this->pen.down = true;
+    }
+
+    void turn(double degrees) {
+      this->direction += M_PI / 180.0 * degrees;
+    }
+
+    void move(cairo_t *cr, double distance) {
+      double new_x = this->x + distance * cos(this->direction);
+      double new_y = this->y + distance * sin(this->direction);
+
+      if (this->pen.down) {
+        draw_line(cr, this->x, this->y, new_x, new_y);
+      }
+
+      this->x = new_x;
+      this->y = new_y;
+    }
+
+    void set_pen_color(double red, double green, double blue) {
+      this->pen.red = red;
+      this->pen.green = green;
+      this->pen.blue = blue;
+    }
+
+    void set_pen_thickness(double thickness) {
+      this->pen.thickness = thickness;
+    }
+};
+
+struct State {
+  Turtle turtle;
+
+  xcb_connection_t *connection;
+  xcb_screen_t *screen;
+  xcb_window_t window;
+  cairo_surface_t *surface;
+
+  State() {
+    // The screen that the server prefers. On modern interactive desktops, there
+    // typically is only 1 screen shared amongst the displays with XRANDR or
+    // similar, and thus this is commonly the single screen #0.
+    int screen_number;
+
+    this->connection = xcb_connect(nullptr, &screen_number);
+    if (xcb_connection_has_error(this->connection)) {
+      spdlog::critical("Could not connect to the X server");
+      exit(1);
+    } else {
+      spdlog::info("Connected to X server");
+    }
+
+    this->screen = xcb_aux_get_screen(this->connection, screen_number);
+    if (!this->screen) {
+      spdlog::critical("Could not access screen #{}", screen_number);
+      exit(1);
+    } else {
+      spdlog::debug("Displaying on screen #{}:", screen_number);
+      spdlog::debug("  root window ID: 0x{0:x}", this->screen->root);
+      spdlog::debug("  root visual ID: 0x{0:x}", this->screen->root_visual);
+      spdlog::debug("  dimensions: {}x{}",
+          this->screen->width_in_pixels,
+          this->screen->height_in_pixels
+      );
+    }
+
+    // FIXME: This does not account for the window size, which means that the
+    //        *top left* of the window is centred, not the window itself.
+    int16_t xpos = this->screen->width_in_pixels / 2;
+    int16_t ypos = this->screen->height_in_pixels / 2;
+
+    uint32_t mask[2];
+    mask[0] = 1;
+    mask[1] = XCB_EVENT_MASK_EXPOSURE;
+
+    this->window = xcb_generate_id(this->connection);
+    xcb_create_window(this->connection,
+                      XCB_COPY_FROM_PARENT,           // Depth
+                      this->window,                   // ID
+                      this->screen->root,             // Parent window
+                      xpos, ypos,                     // Position (x, y)
+                      WIDTH, HEIGHT,                  // Size
+                      2,                              // Border width
+                      XCB_WINDOW_CLASS_INPUT_OUTPUT,  // Class
+                      XCB_COPY_FROM_PARENT,           // Visual ID
+                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, mask  // Masks
+    );
+    xcb_map_window(this->connection, this->window);
+
+    auto visual_type = xcb_aux_find_visual_by_id(this->screen, this->screen->root_visual);
+    this->surface = cairo_xcb_surface_create(
+      this->connection, this->window, visual_type, WIDTH, HEIGHT
+    );
+  }
+
+  ~State() {
+    cairo_surface_finish(this->surface);
+    xcb_disconnect(this->connection);
+  }
+};
+
+int main(int argc, char *argv[]) {
+  CLI::App app;
+  CLI11_PARSE(app, argc, argv);
+
+#ifdef XTURTLE_DEBUG_ENABLED
+  spdlog::set_level(spdlog::level::debug);
+#endif
+
+  auto state = State();
+
+  // Send all queued commands to the server.
+  xcb_flush(state.connection);
 
   spdlog::debug("Starting event loop...");
+  auto *cr = cairo_create(state.surface);
 
   xcb_generic_event_t *event;
-  while ((event = xcb_wait_for_event(connection))) {
+  while ((event = xcb_wait_for_event(state.connection))) {
     switch (event->response_type & ~0x80) {
     case XCB_EXPOSE:
       // Avoid extra redraws by checking if this is
@@ -49,90 +189,18 @@ void run(xcb_connection_t *connection, cairo_surface_t *surface) {
       cairo_paint(cr);
 
       // Diagonal line
-      cairo_move_to(cr, 5, 5);
       cairo_set_line_width(cr, 3);
       cairo_set_source_rgb(cr, 0, 0, 0);
-      cairo_line_to(cr, 495, 495);
-      cairo_stroke(cr);
+      state.turtle.turn(45);
+      state.turtle.move(cr, 700);
 
-      cairo_surface_flush(surface);
+      cairo_surface_flush(state.surface);
       break;
     }
 
     free(event);
-    xcb_flush(connection);
+    xcb_flush(state.connection);
   }
-}
-
-int main(int argc, char *argv[]) {
-  CLI::App app;
-  CLI11_PARSE(app, argc, argv);
-
-#ifdef XTURTLE_DEBUG_ENABLED
-  spdlog::set_level(spdlog::level::debug);
-#endif
-
-  // The screen that the server prefers. On modern interactive desktops, there
-  // typically is only 1 screen shared amongst the displays with XRANDR or
-  // similar, and thus this is commonly the single screen #0.
-  int screen_number;
-
-  auto *connection = xcb_connect(nullptr, &screen_number);
-  if (xcb_connection_has_error(connection)) {
-    spdlog::critical("Could not connect to the X server");
-    return 1;
-  } else {
-    spdlog::info("Connected to X server");
-  }
-
-  auto screen = xcb_aux_get_screen(connection, screen_number);
-  if (!screen) {
-    spdlog::critical("Could not access screen #{}", screen_number);
-    exit(1);
-  } else {
-    spdlog::debug("Displaying on screen #{}:", screen_number);
-    spdlog::debug("  root window ID: 0x{0:x}", screen->root);
-    spdlog::debug("  root visual ID: 0x{0:x}", screen->root_visual);
-    spdlog::debug("  dimensions: {}x{}",
-        screen->width_in_pixels,
-        screen->height_in_pixels
-    );
-  }
-
-  // FIXME: This does not account for the window size, which means that the
-  //        *top left* of the window is centred, not the window itself.
-  int16_t xpos = screen->width_in_pixels / 2;
-  int16_t ypos = screen->height_in_pixels / 2;
-
-  uint32_t mask[2];
-  mask[0] = 1;
-  mask[1] = XCB_EVENT_MASK_EXPOSURE;
-
-  auto window = xcb_generate_id(connection);
-  xcb_create_window(connection,
-                    XCB_COPY_FROM_PARENT,           // Depth
-                    window,                         // ID
-                    screen->root,                   // Parent window
-                    xpos, ypos,                     // Position (x, y)
-                    WIDTH, HEIGHT,                  // Size
-                    2,                              // Border width
-                    XCB_WINDOW_CLASS_INPUT_OUTPUT,  // Class
-                    XCB_COPY_FROM_PARENT,           // Visual ID
-                    XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, mask  // Masks
-  );
-  xcb_map_window(connection, window);
-
-  auto visual_type = xcb_aux_find_visual_by_id(screen, screen->root_visual);
-  auto *surface = cairo_xcb_surface_create(
-    connection, window, visual_type, WIDTH, HEIGHT
-  );
-
-  xcb_flush(connection);
-
-  run(connection, surface);
-
-  cairo_surface_finish(surface);
-  xcb_disconnect(connection);
 
   return 0;
 }
