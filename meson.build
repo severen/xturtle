@@ -34,7 +34,7 @@ endif
 
 conf_data = configuration_data({
   'version': meson.project_version(),
-  'XTURTLE_DEBUG_ENABLED': true,
+  'XTURTLE_DEBUG_ENABLED': get_option('debug'),
 })
 configure_file(
   input: 'include/config.hh.in',
