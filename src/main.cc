@@ -42,6 +42,8 @@ struct Pen {
   double blue;
   double thickness;
   bool down;
+
+  Pen(): red(0), green(0), blue(0), thickness(0.5), down(true) {}
 };
 
 class Turtle {
@@ -49,7 +51,7 @@ class Turtle {
     double x = 0;
     double y = 0;
     double direction = 0;
-    Pen pen = Pen{0, 0, 0, 0, true};
+    Pen pen;
 
   public:
     void pen_up() {
@@ -74,6 +76,13 @@ class Turtle {
 
       this->x = new_x;
       this->y = new_y;
+    }
+
+    void reset() {
+      this->x = 0;
+      this->x = 0;
+      this->direction = 0;
+      this->pen = Pen();
     }
 
     void set_pen_color(double red, double green, double blue) {
@@ -166,7 +175,7 @@ int main(int argc, char *argv[]) {
   spdlog::set_level(spdlog::level::debug);
 #endif
 
-  auto state = State();
+  State state;
 
   // Send all queued commands to the server.
   xcb_flush(state.connection);
