@@ -20,6 +20,16 @@ if not spdlog_dep.found()
     'enable_examples=false',
   ])
   deps += spdlog_proj.get_variable('spdlog_dep')
+else
+  deps += spdlog_dep
+endif
+
+cli11_dep = dependency('CLI11', required: false)
+if not cli11_dep.found()
+  cli11_proj = subproject('CLI11')
+  deps += cli11_proj.get_variable('CLI11_dep')
+else
+  deps += cli11_dep
 endif
 
 conf_data = configuration_data({

@@ -19,6 +19,7 @@
 #include <xcb/xcb_util.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
+#include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
 
 #include "config.hh"
@@ -63,7 +64,10 @@ void run(xcb_connection_t *connection, cairo_surface_t *surface) {
   }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  CLI::App app;
+  CLI11_PARSE(app, argc, argv);
+
 #ifdef XTURTLE_DEBUG_ENABLED
   spdlog::set_level(spdlog::level::debug);
 #endif

@@ -3,4 +3,5 @@ build/
 
 # Subprojects
 subprojects/*
+!subprojects/CLI11.wrap
 !subprojects/spdlog.wrap
