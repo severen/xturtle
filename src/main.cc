@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with xturtle.  If not, see <https://www.gnu.org/licenses/>.
 
-#include <iostream>
 #include <cmath>
 
 #include <CLI/CLI.hpp>
@@ -23,78 +22,13 @@
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
 
+#include "turtle.hh"
 #include "config.hh"
 
 // The width and height of the window in pixels.
+// TODO: Make this configurable.
 const uint16_t WIDTH = 500;
 const uint16_t HEIGHT = 500;
-
-/// Draw a line from the point (x1, y1) to the point (x2, y2).
-void draw_line(cairo_t *cr, double x1, double y1, double x2, double y2) {
-  cairo_move_to(cr, x1, y1);
-  cairo_line_to(cr, x2, y2);
-  cairo_stroke(cr);
-}
-
-struct Pen {
-  double red;
-  double green;
-  double blue;
-  double thickness;
-  bool down;
-
-  Pen(): red(0), green(0), blue(0), thickness(0.5), down(true) {}
-};
-
-class Turtle {
-  private:
-    double x = 0;
-    double y = 0;
-    double direction = 0;
-    Pen pen;
-
-  public:
-    void pen_up() {
-      this->pen.down = false;
-    }
-
-    void pen_down() {
-      this->pen.down = true;
-    }
-
-    void turn(double degrees) {
-      this->direction += M_PI / 180.0 * degrees;
-    }
-
-    void move(cairo_t *cr, double distance) {
-      double new_x = this->x + distance * cos(this->direction);
-      double new_y = this->y + distance * sin(this->direction);
-
-      if (this->pen.down) {
-        draw_line(cr, this->x, this->y, new_x, new_y);
-      }
-
-      this->x = new_x;
-      this->y = new_y;
-    }
-
-    void reset() {
-      this->x = 0;
-      this->x = 0;
-      this->direction = 0;
-      this->pen = Pen();
-    }
-
-    void set_pen_color(double red, double green, double blue) {
-      this->pen.red = red;
-      this->pen.green = green;
-      this->pen.blue = blue;
-    }
-
-    void set_pen_thickness(double thickness) {
-      this->pen.thickness = thickness;
-    }
-};
 
 struct State {
   Turtle turtle;
@@ -175,8 +109,8 @@ int main(int argc, char *argv[]) {
   spdlog::set_level(spdlog::level::debug);
 #endif
 
+  // Initialise state such as the server connection.
   State state;
-
   // Send all queued commands to the server.
   xcb_flush(state.connection);
 
