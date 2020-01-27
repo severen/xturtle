@@ -39,9 +39,9 @@ struct State {
   cairo_surface_t *surface;
 
   State() {
-    // The screen that the server prefers. On modern interactive desktops, there
-    // typically is only 1 screen shared amongst the displays with XRANDR or
-    // similar, and thus this is commonly the single screen #0.
+    // The screen that the server prefers. On modern interactive desktops,
+    // there typically is only 1 screen shared amongst the displays with XRANDR
+    // or similar, and thus this is commonly the single screen #0.
     int screen_number;
 
     this->connection = xcb_connect(nullptr, &screen_number);
@@ -89,7 +89,9 @@ struct State {
     );
     xcb_map_window(this->connection, this->window);
 
-    auto visual_type = xcb_aux_find_visual_by_id(this->screen, this->screen->root_visual);
+    auto visual_type = xcb_aux_find_visual_by_id(
+      this->screen, this->screen->root_visual
+    );
     this->surface = cairo_xcb_surface_create(
       this->connection, this->window, visual_type, WIDTH, HEIGHT
     );
@@ -121,21 +123,24 @@ int main(int argc, char *argv[]) {
   while ((event = xcb_wait_for_event(state.connection))) {
     switch (event->response_type & ~0x80) {
     case XCB_EXPOSE:
-      // Avoid extra redraws by checking if this is
-      // the last expose event in the sequence.
+      // Avoid extra redraws by checking if this is the last expose event in
+      // the sequence.
       if (((xcb_expose_event_t *) event)->count != 0) {
         break;
       }
 
+      auto& turtle = state.turtle;
+
       // White background
+      // TODO: Make this configurable.
       cairo_set_source_rgb(cr, 1, 1, 1);
       cairo_paint(cr);
 
       // Diagonal line
       cairo_set_line_width(cr, 3);
       cairo_set_source_rgb(cr, 0, 0, 0);
-      state.turtle.turn(45);
-      state.turtle.move(cr, 700);
+      turtle.turn(45);
+      turtle.move(cr, 700);
 
       cairo_surface_flush(state.surface);
       break;
