@@ -19,6 +19,7 @@
 #include <spdlog/spdlog.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_util.h>
+#include <xcb/xcb_keysyms.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
 
@@ -110,14 +111,15 @@ int main(int argc, char *argv[]) {
 
   // Initialise state such as the server connection.
   State state;
-  // Send all queued commands to the server.
+  // Send any queued commands to the server.
   xcb_flush(state.connection);
 
-  spdlog::debug("Starting event loop...");
   auto *cr = cairo_create(state.surface);
 
+  spdlog::debug("Starting event loop...");
+  bool done = false;
   xcb_generic_event_t *event;
-  while ((event = xcb_wait_for_event(state.connection))) {
+  while (!done && (event = xcb_wait_for_event(state.connection))) {
     switch (event->response_type & ~0x80) {
     case XCB_EXPOSE: {
       spdlog::debug("Expose event recieved");
@@ -151,7 +153,25 @@ int main(int argc, char *argv[]) {
       auto configure = (xcb_configure_notify_event_t *)event;
 
       cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
+
       cairo_surface_flush(state.surface);
+      break;
+    }
+
+    case XCB_KEY_PRESS: {
+      spdlog::debug("Key press event recieved");
+      auto key_press = (xcb_key_press_event_t *)event;
+
+      auto keysyms = xcb_key_symbols_alloc(state.connection);
+      auto keysym = xcb_key_press_lookup_keysym(keysyms, key_press, 0);
+
+      // Quit if q was pressed.
+      if (keysym == 113) {
+        done = true;
+      }
+
+      free(keysyms);
+      break;
     }
 
     default:
