@@ -1,11 +1,14 @@
 # xturtle
 
-xturtle is a toy [turtle graphics](https://en.wikipedia.org/wiki/Turtle_graphics)
-program for Linux/X11 that uses GNU Guile for scripting.
+xturtle is a [turtle graphics](https://en.wikipedia.org/wiki/Turtle_graphics)
+program for Linux/X11 that is controlled by
+[Scheme](https://en.wikipedia.org/wiki/Scheme_(programming_language)), a
+dialect of the Lisp family of programming languages.
 
-This is mostly an exercise in learning how X11 works and how to write programs
-for it with libraries such as XCB and Cairo. It also serves as an excuse to get
-better at writing C/C++.
+**Warning**: xturtle was written for my own personal education in bare-bones
+Linux application development and as such should not be used for anything
+serious. That being said, it may serve as a useful example of wiring up XCB and
+Cairo.
 
 ## Building
 
@@ -16,13 +19,11 @@ installed, as well as the following dependencies:
 - xcb-util;
 - cairo;
 - guile-2.2;
-- spdlog (optional, will be built from source if not available).
+- spdlog (optional, will be built from source if not available);
+- CLI11 (optional, will be built from source if not available).
 
 If the above are available, run the following to build xturtle:
-
 ```sh
 $ meson build
 $ ninja -C build
 ```
-
-The compiled `xturtle` binary will be in the `build` directory.
