@@ -66,26 +66,23 @@ struct State {
       );
     }
 
-    // FIXME: This does not account for the window size, which means that the
-    //        *top left* of the window is centred, not the window itself.
-    int16_t xpos = this->screen->width_in_pixels / 2;
-    int16_t ypos = this->screen->height_in_pixels / 2;
-
-    uint32_t mask[2];
-    mask[0] = 1;
-    mask[1] = XCB_EVENT_MASK_EXPOSURE;
-
+    const uint32_t mask = XCB_CW_EVENT_MASK;
+    const uint32_t values[] = {
+      XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+      XCB_EVENT_MASK_EXPOSURE |
+      XCB_EVENT_MASK_KEY_PRESS
+    };
     this->window = xcb_generate_id(this->connection);
     xcb_create_window(this->connection,
                       XCB_COPY_FROM_PARENT,           // Depth
                       this->window,                   // ID
                       this->screen->root,             // Parent window
-                      xpos, ypos,                     // Position (x, y)
+                      0, 0,                           // Position (x, y)
                       WIDTH, HEIGHT,                  // Size
                       2,                              // Border width
                       XCB_WINDOW_CLASS_INPUT_OUTPUT,  // Class
                       XCB_COPY_FROM_PARENT,           // Visual ID
-                      XCB_CW_OVERRIDE_REDIRECT | XCB_CW_EVENT_MASK, mask  // Masks
+                      mask, values                    // Mask
     );
     xcb_map_window(this->connection, this->window);
 
@@ -122,27 +119,43 @@ int main(int argc, char *argv[]) {
   xcb_generic_event_t *event;
   while ((event = xcb_wait_for_event(state.connection))) {
     switch (event->response_type & ~0x80) {
-    case XCB_EXPOSE:
+    case XCB_EXPOSE: {
+      spdlog::debug("Expose event recieved");
+
       // Avoid extra redraws by checking if this is the last expose event in
       // the sequence.
-      if (((xcb_expose_event_t *) event)->count != 0) {
+      if (((xcb_expose_event_t *)event)->count != 0) {
         break;
       }
 
       auto& turtle = state.turtle;
 
-      // White background
+      // Background
       // TODO: Make this configurable.
       cairo_set_source_rgb(cr, 1, 1, 1);
       cairo_paint(cr);
 
-      // Diagonal line
+      // Test the basic turtle commands.
       cairo_set_line_width(cr, 3);
       cairo_set_source_rgb(cr, 0, 0, 0);
+      turtle.reset();
       turtle.turn(45);
       turtle.move(cr, 700);
 
       cairo_surface_flush(state.surface);
+      break;
+    }
+
+    case XCB_CONFIGURE_NOTIFY: {
+      spdlog::debug("Configure notify event recieved");
+      auto configure = (xcb_configure_notify_event_t *)event;
+
+      cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
+      cairo_surface_flush(state.surface);
+    }
+
+    default:
+      // Ignore unknown event types.
       break;
     }
 

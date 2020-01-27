@@ -46,7 +46,7 @@ void Turtle::move(cairo_t *cr, double distance) {
 
 void Turtle::reset() {
   this->x = 0;
-  this->x = 0;
+  this->y = 0;
   this->direction = 0;
   this->pen = Pen();
 }
