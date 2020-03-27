@@ -14,6 +14,8 @@
 // along with xturtle.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 #include <cmath>
 
@@ -27,6 +29,8 @@
 
 #include "turtle.hh"
 #include "config.hh"
+
+using namespace std::chrono_literals;
 
 // The width and height of the window in pixels.
 // TODO: Make this configurable.
@@ -106,78 +110,101 @@ struct State {
   }
 };
 
+bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
+  if (!event) {
+    return false;
+  }
+
+  switch (event->response_type & ~0x80) {
+  case XCB_EXPOSE: {
+    spdlog::debug("Expose event recieved");
+
+    // Avoid extra redraws by checking if this is the last expose event in
+    // the sequence.
+    if (((xcb_expose_event_t *)event)->count != 0) {
+      break;
+    }
+
+    auto& turtle = state.turtle;
+
+    // Background
+    // TODO: Make this configurable.
+    cairo_set_source_rgb(state.cr, 1, 1, 1);
+    cairo_paint(state.cr);
+
+    // Test the basic turtle commands.
+    cairo_set_line_width(state.cr, 3);
+    cairo_set_source_rgb(state.cr, 0, 0, 0);
+    turtle.reset();
+    turtle.turn(45);
+    turtle.move(state.cr, 700);
+
+    // TODO: Ascertain whether this call is really needed.
+    cairo_surface_flush(state.surface);
+    break;
+  }
+
+  case XCB_CONFIGURE_NOTIFY: {
+    spdlog::debug("Configure notify event recieved");
+    auto configure = (xcb_configure_notify_event_t *)event;
+
+    cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
+
+    cairo_surface_flush(state.surface);
+    break;
+  }
+
+  case XCB_KEY_PRESS: {
+    spdlog::debug("Key press event recieved");
+    auto key_press = (xcb_key_press_event_t *)event;
+
+    auto keysyms = xcb_key_symbols_alloc(state.connection);
+    auto keysym = xcb_key_press_lookup_keysym(keysyms, key_press, 0);
+
+    // Quit if q was pressed.
+    if (keysym == 113) {
+      return true;
+    }
+
+    free(keysyms);
+    break;
+  }
+
+  default:
+    // Ignore unknown event types.
+    break;
+  }
+
+  free(event);
+  return false;
+}
+
 int run() {
   // Initialise state such as the server connection.
   State state;
   // Send any queued commands to the server.
   xcb_flush(state.connection);
 
+  using clock = std::chrono::steady_clock;
+
+  // Use a fixed timestep of (1s)/(60 fps) = 16 ms.
+  constexpr std::chrono::nanoseconds TIMESTEP = 16ms;
+
   spdlog::debug("Starting event loop...");
   bool done = false;
-  xcb_generic_event_t *event;
-  while (!done && (event = xcb_wait_for_event(state.connection))) {
-    switch (event->response_type & ~0x80) {
-    case XCB_EXPOSE: {
-      spdlog::debug("Expose event recieved");
+  while (!done) {
+    auto start = clock::now();
 
-      // Avoid extra redraws by checking if this is the last expose event in
-      // the sequence.
-      if (((xcb_expose_event_t *)event)->count != 0) {
-        break;
-      }
-
-      auto& turtle = state.turtle;
-
-      // Background
-      // TODO: Make this configurable.
-      cairo_set_source_rgb(state.cr, 1, 1, 1);
-      cairo_paint(state.cr);
-
-      // Test the basic turtle commands.
-      cairo_set_line_width(state.cr, 3);
-      cairo_set_source_rgb(state.cr, 0, 0, 0);
-      turtle.reset();
-      turtle.turn(45);
-      turtle.move(state.cr, 700);
-
-      // TODO: Ascertain whether this call is really needed.
-      cairo_surface_flush(state.surface);
-      break;
+    // Process input via X events over xcb.
+    xcb_generic_event_t *event = xcb_poll_for_event(state.connection);
+    if (handle_xcb_event(event, state)) {
+      done = true;
     }
 
-    case XCB_CONFIGURE_NOTIFY: {
-      spdlog::debug("Configure notify event recieved");
-      auto configure = (xcb_configure_notify_event_t *)event;
-
-      cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
-
-      cairo_surface_flush(state.surface);
-      break;
-    }
-
-    case XCB_KEY_PRESS: {
-      spdlog::debug("Key press event recieved");
-      auto key_press = (xcb_key_press_event_t *)event;
-
-      auto keysyms = xcb_key_symbols_alloc(state.connection);
-      auto keysym = xcb_key_press_lookup_keysym(keysyms, key_press, 0);
-
-      // Quit if q was pressed.
-      if (keysym == 113) {
-        done = true;
-      }
-
-      free(keysyms);
-      break;
-    }
-
-    default:
-      // Ignore unknown event types.
-      break;
-    }
-
-    free(event);
     xcb_flush(state.connection);
+
+    auto end = clock::now();
+    std::this_thread::sleep_for(start + TIMESTEP - end);
   }
 
   return 0;
