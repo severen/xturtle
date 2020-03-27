@@ -40,6 +40,7 @@ struct State {
   xcb_screen_t *screen;
   xcb_window_t window;
   cairo_surface_t *surface;
+  cairo_t *cr;
 
   State() {
     // The screen that the server prefers. On modern interactive desktops,
@@ -95,9 +96,11 @@ struct State {
     this->surface = cairo_xcb_surface_create(
       this->connection, this->window, visual_type, WIDTH, HEIGHT
     );
+    this->cr = cairo_create(this->surface);
   }
 
   ~State() {
+    cairo_destroy(this->cr);
     cairo_surface_finish(this->surface);
     xcb_disconnect(this->connection);
   }
@@ -131,8 +134,6 @@ int main(int argc, char *argv[]) {
   // Send any queued commands to the server.
   xcb_flush(state.connection);
 
-  auto *cr = cairo_create(state.surface);
-
   spdlog::debug("Starting event loop...");
   bool done = false;
   xcb_generic_event_t *event;
@@ -151,16 +152,17 @@ int main(int argc, char *argv[]) {
 
       // Background
       // TODO: Make this configurable.
-      cairo_set_source_rgb(cr, 1, 1, 1);
-      cairo_paint(cr);
+      cairo_set_source_rgb(state.cr, 1, 1, 1);
+      cairo_paint(state.cr);
 
       // Test the basic turtle commands.
-      cairo_set_line_width(cr, 3);
-      cairo_set_source_rgb(cr, 0, 0, 0);
+      cairo_set_line_width(state.cr, 3);
+      cairo_set_source_rgb(state.cr, 0, 0, 0);
       turtle.reset();
       turtle.turn(45);
-      turtle.move(cr, 700);
+      turtle.move(state.cr, 700);
 
+      // TODO: Ascertain whether this call is really needed.
       cairo_surface_flush(state.surface);
       break;
     }
