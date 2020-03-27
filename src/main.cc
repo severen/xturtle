@@ -187,6 +187,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
       return true;
     }
 
+    free(delete_reply);
     break;
   }
 
@@ -209,6 +210,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
     // Quit if q was pressed.
     if (keysym == 113) {
+      free(keysyms);
       return true;
     }
 
