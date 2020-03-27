@@ -15,6 +15,7 @@
 
 #include <iostream>
 
+#include <cstdint>
 #include <cmath>
 
 #include <CLI/CLI.hpp>
