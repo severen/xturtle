@@ -39,7 +39,7 @@ class Turtle {
     void pen_up();
     void pen_down();
 
-    void turn(double degrees);
+    void turn(double theta);
     void move(cairo_t *cr, double distance);
     void reset();
 

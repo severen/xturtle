@@ -28,8 +28,8 @@ void Turtle::pen_down() {
   this->pen.down = true;
 }
 
-void Turtle::turn(double degrees) {
-  this->direction += M_PI / 180.0 * degrees;
+void Turtle::turn(double theta) {
+  this->direction += M_PI / 180.0 * theta;
 }
 
 void Turtle::move(cairo_t *cr, double distance) {

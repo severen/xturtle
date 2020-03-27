@@ -146,10 +146,11 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
   switch (event->response_type & ~0x80) {
   case XCB_EXPOSE: {
     spdlog::debug("Expose event recieved");
+    auto expose = (xcb_expose_event_t *)event;
 
     // Avoid extra redraws by checking if this is the last expose event in
     // the sequence.
-    if (((xcb_expose_event_t *)event)->count != 0) {
+    if (expose->count != 0) {
       break;
     }
 
@@ -174,7 +175,6 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
   case XCB_CLIENT_MESSAGE: {
     spdlog::debug("ClientMessage event recieved");
-
     auto client_message = (xcb_client_message_event_t *)event;
 
     auto delete_cookie =
@@ -207,14 +207,13 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
     auto keysyms = xcb_key_symbols_alloc(state.connection);
     auto keysym = xcb_key_press_lookup_keysym(keysyms, key_press, 0);
+    free(keysyms);
 
     // Quit if q was pressed.
     if (keysym == 113) {
-      free(keysyms);
       return true;
     }
 
-    free(keysyms);
     break;
   }
 
@@ -276,7 +275,7 @@ int main(int argc, char *argv[]) {
   if (version_flag->count() > 0) {
     std::cout << "xturtle " << XTURTLE_VERSION << " ";
 #ifdef XTURTLE_DEBUG_ENABLED
-      std::cout << "(debug enabled)";
+    std::cout << "(debug enabled)";
 #endif
     std::cout << "\n";
 
