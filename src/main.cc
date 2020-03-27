@@ -106,29 +106,7 @@ struct State {
   }
 };
 
-int main(int argc, char *argv[]) {
-  CLI::App app;
-  CLI::Option *vflag = app.add_flag(
-    "-V,--version",
-    "Print version information and exit"
-  );
-
-  CLI11_PARSE(app, argc, argv);
-
-  if (vflag->count() > 0) {
-    std::cout << "xturtle " << XTURTLE_VERSION << " ";
-#ifdef XTURTLE_DEBUG_ENABLED
-      std::cout << "(debug enabled)";
-#endif
-    std::cout << "\n";
-
-    return 0;
-  }
-
-#ifdef XTURTLE_DEBUG_ENABLED
-  spdlog::set_level(spdlog::level::debug);
-#endif
-
+int run() {
   // Initialise state such as the server connection.
   State state;
   // Send any queued commands to the server.
@@ -203,4 +181,30 @@ int main(int argc, char *argv[]) {
   }
 
   return 0;
+}
+
+int main(int argc, char *argv[]) {
+  CLI::App app;
+  CLI::Option *vflag = app.add_flag(
+    "-V,--version",
+    "Print version information and exit"
+  );
+
+  CLI11_PARSE(app, argc, argv);
+
+  if (vflag->count() > 0) {
+    std::cout << "xturtle " << XTURTLE_VERSION << " ";
+#ifdef XTURTLE_DEBUG_ENABLED
+      std::cout << "(debug enabled)";
+#endif
+    std::cout << "\n";
+
+    return 0;
+  }
+
+#ifdef XTURTLE_DEBUG_ENABLED
+  spdlog::set_level(spdlog::level::debug);
+#endif
+
+  return run();
 }
