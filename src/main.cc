@@ -262,14 +262,18 @@ int run() {
 
 int main(int argc, char *argv[]) {
   CLI::App app;
-  CLI::Option *vflag = app.add_flag(
+  CLI::Option *version_flag = app.add_flag(
     "-V,--version",
     "Print version information and exit"
+  );
+  CLI::Option *verbose_flag = app.add_flag(
+    "-v,--verbose",
+    "Enable verbose output"
   );
 
   CLI11_PARSE(app, argc, argv);
 
-  if (vflag->count() > 0) {
+  if (version_flag->count() > 0) {
     std::cout << "xturtle " << XTURTLE_VERSION << " ";
 #ifdef XTURTLE_DEBUG_ENABLED
       std::cout << "(debug enabled)";
@@ -279,9 +283,15 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  if (verbose_flag->count() > 0) {
 #ifdef XTURTLE_DEBUG_ENABLED
-  spdlog::set_level(spdlog::level::debug);
+    spdlog::set_level(spdlog::level::debug);
+#elif
+    spdlog::set_level(spdlog::level::info);
 #endif
+  } else {
+    spdlog::set_level(spdlog::level::warn);
+  }
 
   return run();
 }
