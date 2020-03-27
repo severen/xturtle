@@ -47,6 +47,10 @@ struct State {
   cairo_t *cr;
 
   State() {
+    // NOTE: This method is not for the faint of heart. X protocol/xcb horrors
+    // lie below. I hope that this serves as a sufficient warning for my future
+    // self.
+
     // The screen that the server prefers. On modern interactive desktops,
     // there typically is only 1 screen shared amongst the displays with XRANDR
     // or similar, and thus this is commonly the single screen #0.
@@ -74,25 +78,46 @@ struct State {
       );
     }
 
-    const uint32_t mask = XCB_CW_EVENT_MASK;
-    const uint32_t values[] = {
+    uint32_t mask = XCB_CW_EVENT_MASK;
+    uint32_t values[] = {
       XCB_EVENT_MASK_STRUCTURE_NOTIFY |
       XCB_EVENT_MASK_EXPOSURE |
       XCB_EVENT_MASK_KEY_PRESS
     };
     this->window = xcb_generate_id(this->connection);
-    xcb_create_window(this->connection,
-                      XCB_COPY_FROM_PARENT,           // Depth
-                      this->window,                   // ID
-                      this->screen->root,             // Parent window
-                      0, 0,                           // Position (x, y)
-                      WIDTH, HEIGHT,                  // Size
-                      2,                              // Border width
-                      XCB_WINDOW_CLASS_INPUT_OUTPUT,  // Class
-                      XCB_COPY_FROM_PARENT,           // Visual ID
-                      mask, values                    // Mask
+    xcb_create_window(
+      this->connection,
+      XCB_COPY_FROM_PARENT,          // Depth
+      this->window,                  // ID
+      this->screen->root,            // Parent window
+      0, 0,                          // Position (x, y)
+      WIDTH, HEIGHT,                 // Size
+      2,                             // Border width
+      XCB_WINDOW_CLASS_INPUT_OUTPUT, // Class
+      XCB_COPY_FROM_PARENT,          // Visual ID
+      mask, values                   // Mask
     );
-    xcb_map_window(this->connection, this->window);
+
+    // Register for the ICCM `WM_DELETE_WINDOW` ClientMessage event.
+    // https://x.org/releases/current/doc/xorg-docs/icccm/icccm.html#Window_Deletion
+    auto protocols_cookie =
+      xcb_intern_atom(this->connection, 0, 12, "WM_PROTOCOLS");
+    auto *protocols_reply =
+      xcb_intern_atom_reply(this->connection, protocols_cookie, 0);
+    auto delete_cookie = xcb_intern_atom(connection, 0, 16, "WM_DELETE_WINDOW");
+    auto *delete_reply = xcb_intern_atom_reply(connection, delete_cookie, 0);
+    xcb_change_property(
+      this->connection,
+      XCB_PROP_MODE_REPLACE, // Mode
+      this->window,          // Window
+      protocols_reply->atom, // Property
+      XCB_ATOM_ATOM,         // Type
+      32,                    // Format
+      1,                     // Data length
+      &delete_reply->atom    // Data
+    );
+    free(delete_reply);
+    free(protocols_reply);
 
     auto visual_type = xcb_aux_find_visual_by_id(
       this->screen, this->screen->root_visual
@@ -115,6 +140,8 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
     return false;
   }
 
+  // NOTE: Remember to register for the events in `xcb_create_window` when
+  // adding new cases here.
   switch (event->response_type & ~0x80) {
   case XCB_EXPOSE: {
     spdlog::debug("Expose event recieved");
@@ -144,8 +171,26 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
     break;
   }
 
+  case XCB_CLIENT_MESSAGE: {
+    spdlog::debug("ClientMessage event recieved");
+
+    auto client_message = (xcb_client_message_event_t *)event;
+
+    auto delete_cookie =
+      xcb_intern_atom(state.connection, 0, 16, "WM_DELETE_WINDOW");
+    auto *delete_reply =
+      xcb_intern_atom_reply(state.connection, delete_cookie, 0);
+
+    if (client_message->data.data32[0] == delete_reply->atom) {
+      free(delete_reply);
+      return true;
+    }
+
+    break;
+  }
+
   case XCB_CONFIGURE_NOTIFY: {
-    spdlog::debug("Configure notify event recieved");
+    spdlog::debug("ConfigureNotify event recieved");
     auto configure = (xcb_configure_notify_event_t *)event;
 
     cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
@@ -155,7 +200,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
   }
 
   case XCB_KEY_PRESS: {
-    spdlog::debug("Key press event recieved");
+    spdlog::debug("KeyPress event recieved");
     auto key_press = (xcb_key_press_event_t *)event;
 
     auto keysyms = xcb_key_symbols_alloc(state.connection);
@@ -182,7 +227,9 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 int run() {
   // Initialise state such as the server connection.
   State state;
-  // Send any queued commands to the server.
+
+  // Make the window visible.
+  xcb_map_window(state.connection, state.window);
   xcb_flush(state.connection);
 
   using clock = std::chrono::steady_clock;
@@ -196,7 +243,7 @@ int run() {
     auto start = clock::now();
 
     // Process input via X events over xcb.
-    xcb_generic_event_t *event = xcb_poll_for_event(state.connection);
+    auto *event = xcb_poll_for_event(state.connection);
     if (handle_xcb_event(event, state)) {
       done = true;
     }
