@@ -221,7 +221,6 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
     break;
   }
 
-  free(event);
   return false;
 }
 
@@ -248,6 +247,7 @@ int run() {
     if (handle_xcb_event(event, state)) {
       done = true;
     }
+    free(event);
 
     xcb_flush(state.connection);
 
