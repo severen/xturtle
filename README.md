@@ -17,6 +17,7 @@ installed, as well as the following dependencies:
 
 - xcb;
 - xcb-util;
+- xcb-util-wm;
 - xcb-keysyms;
 - cairo;
 - guile-2.2;

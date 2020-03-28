@@ -9,6 +9,7 @@ project('xturtle', 'cpp',
 deps = [
   dependency('xcb'),
   dependency('xcb-util'),
+  dependency('xcb-icccm'),
   dependency('xcb-keysyms'),
   dependency('cairo'),
   dependency('guile-2.2'),

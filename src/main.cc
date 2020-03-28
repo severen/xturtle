@@ -24,6 +24,7 @@
 #include <spdlog/spdlog.h>
 #include <xcb/xcb.h>
 #include <xcb/xcb_util.h>
+#include <xcb/xcb_icccm.h>
 #include <xcb/xcb_keysyms.h>
 #include <cairo/cairo.h>
 #include <cairo/cairo-xcb.h>
@@ -107,15 +108,12 @@ struct State {
       xcb_intern_atom_reply(this->connection, protocols_cookie, 0);
     auto delete_cookie = xcb_intern_atom(connection, 0, 16, "WM_DELETE_WINDOW");
     auto *delete_reply = xcb_intern_atom_reply(connection, delete_cookie, 0);
-    xcb_change_property(
+    xcb_icccm_set_wm_protocols(
       this->connection,
-      XCB_PROP_MODE_REPLACE, // Mode
       this->window,          // Window
-      protocols_reply->atom, // Property
-      XCB_ATOM_ATOM,         // Type
-      32,                    // Format
-      1,                     // Data length
-      &delete_reply->atom    // Data
+      protocols_reply->atom, // WM_PROTOCOLS atom
+      1,                     // Atom list length
+      &delete_reply->atom    // Atom list
     );
     free(delete_reply);
     free(protocols_reply);
