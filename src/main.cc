@@ -138,6 +138,12 @@ struct State {
 
 bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
   if (!event) {
+    // TODO: Check the exit code and present a more granular error message.
+    if (xcb_connection_has_error(state.connection)) {
+      spdlog::critical("Connection to X server lost");
+      exit(1);
+    }
+
     return false;
   }
 
