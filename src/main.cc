@@ -59,7 +59,7 @@ struct State {
     int screen_number;
 
     this->connection = xcb_connect(nullptr, &screen_number);
-    if (xcb_connection_has_error(this->connection)) {
+    if (xcb_connection_has_error(this->connection) != 0) {
       spdlog::critical("Could not connect to the X server");
       exit(1);
     } else {
@@ -67,7 +67,7 @@ struct State {
     }
 
     this->screen = xcb_aux_get_screen(this->connection, screen_number);
-    if (!this->screen) {
+    if (this->screen == nullptr) {
       spdlog::critical("Could not access screen #{}", screen_number);
       exit(1);
     } else {
@@ -104,10 +104,11 @@ struct State {
     // https://x.org/releases/current/doc/xorg-docs/icccm/icccm.html#Window_Deletion
     auto protocols_cookie =
       xcb_intern_atom(this->connection, 0, 12, "WM_PROTOCOLS");
-    auto *protocols_reply =
-      xcb_intern_atom_reply(this->connection, protocols_cookie, 0);
     auto delete_cookie = xcb_intern_atom(connection, 0, 16, "WM_DELETE_WINDOW");
-    auto *delete_reply = xcb_intern_atom_reply(connection, delete_cookie, 0);
+    auto *protocols_reply =
+      xcb_intern_atom_reply(this->connection, protocols_cookie, nullptr);
+    auto *delete_reply =
+      xcb_intern_atom_reply(connection, delete_cookie, nullptr);
     xcb_icccm_set_wm_protocols(
       this->connection,
       this->window,          // Window
@@ -135,9 +136,9 @@ struct State {
 };
 
 bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
-  if (!event) {
+  if (event == nullptr) {
     // TODO: Check the exit code and present a more granular error message.
-    if (xcb_connection_has_error(state.connection)) {
+    if (xcb_connection_has_error(state.connection) != 0) {
       spdlog::critical("Connection to X server lost");
       exit(1);
     }
@@ -184,7 +185,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
     auto delete_cookie =
       xcb_intern_atom(state.connection, 0, 16, "WM_DELETE_WINDOW");
     auto *delete_reply =
-      xcb_intern_atom_reply(state.connection, delete_cookie, 0);
+      xcb_intern_atom_reply(state.connection, delete_cookie, nullptr);
 
     if (client_message->data.data32[0] == delete_reply->atom) {
       free(delete_reply);
