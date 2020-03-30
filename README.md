@@ -18,7 +18,7 @@ installed, as well as the following dependencies:
 - xcb;
 - xcb-util;
 - xcb-util-wm;
-- xcb-keysyms;
+- xcb-util-keysyms;
 - cairo;
 - guile-2.2;
 - spdlog (optional, will be built from source if not available);
