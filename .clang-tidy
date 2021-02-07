@@ -1,1 +1,1 @@
-Checks: '-*, -clang-analyzer-*, performance-*, portability-*, readability-*, modernize-*, misc-*'
+Checks: '-*, clang-analyzer-*, performance-*, portability-*, readability-*, modernize-*, misc-*, -modernize-use-trailing-return-type'
