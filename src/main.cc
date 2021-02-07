@@ -14,6 +14,7 @@
 // along with xturtle.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <iostream>
+#include <array>
 #include <chrono>
 #include <thread>
 
@@ -81,7 +82,7 @@ struct State {
     }
 
     uint32_t mask = XCB_CW_EVENT_MASK;
-    uint32_t values[] = {
+    std::array<uint32_t, 1> values = {
       XCB_EVENT_MASK_STRUCTURE_NOTIFY |
       XCB_EVENT_MASK_EXPOSURE |
       XCB_EVENT_MASK_KEY_PRESS
@@ -97,7 +98,7 @@ struct State {
       2,                             // Border width
       XCB_WINDOW_CLASS_INPUT_OUTPUT, // Class
       XCB_COPY_FROM_PARENT,          // Visual ID
-      mask, values                   // Mask
+      mask, values.data()            // Mask
     );
 
     // Register for the ICCM `WM_DELETE_WINDOW` ClientMessage event.
@@ -119,7 +120,7 @@ struct State {
     free(delete_reply);
     free(protocols_reply);
 
-    auto visual_type = xcb_aux_find_visual_by_id(
+    auto *visual_type = xcb_aux_find_visual_by_id(
       this->screen, this->screen->root_visual
     );
     this->surface = cairo_xcb_surface_create(
@@ -151,7 +152,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
   switch (event->response_type & ~0x80) {
   case XCB_EXPOSE: {
     spdlog::debug("Expose event recieved");
-    auto expose = (xcb_expose_event_t *)event;
+    auto *expose = (xcb_expose_event_t *)event;
 
     // Avoid extra redraws by checking if this is the last expose event in
     // the sequence.
@@ -180,7 +181,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
   case XCB_CLIENT_MESSAGE: {
     spdlog::debug("ClientMessage event recieved");
-    auto client_message = (xcb_client_message_event_t *)event;
+    auto *client_message = (xcb_client_message_event_t *)event;
 
     auto delete_cookie =
       xcb_intern_atom(state.connection, 0, 16, "WM_DELETE_WINDOW");
@@ -198,7 +199,7 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
   case XCB_CONFIGURE_NOTIFY: {
     spdlog::debug("ConfigureNotify event recieved");
-    auto configure = (xcb_configure_notify_event_t *)event;
+    auto *configure = (xcb_configure_notify_event_t *)event;
 
     cairo_xcb_surface_set_size(state.surface, configure->width, configure->height);
 
@@ -208,9 +209,9 @@ bool handle_xcb_event(xcb_generic_event_t *event, State& state) {
 
   case XCB_KEY_PRESS: {
     spdlog::debug("KeyPress event recieved");
-    auto key_press = (xcb_key_press_event_t *)event;
+    auto *key_press = (xcb_key_press_event_t *)event;
 
-    auto keysyms = xcb_key_symbols_alloc(state.connection);
+    auto *keysyms = xcb_key_symbols_alloc(state.connection);
     auto keysym = xcb_key_press_lookup_keysym(keysyms, key_press, 0);
     free(keysyms);
 
