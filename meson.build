@@ -12,7 +12,7 @@ deps = [
   dependency('xcb-icccm'),
   dependency('xcb-keysyms'),
   dependency('cairo'),
-  dependency('guile-2.2'),
+  dependency('guile-3.0'),
 ]
 
 spdlog_dep = dependency('spdlog', version: '>=1.5.0', required: false)
